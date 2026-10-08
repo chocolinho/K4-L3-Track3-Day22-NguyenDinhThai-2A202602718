@@ -7,6 +7,8 @@
 
 > Số liệu lấy từ output `colab/Lab22_DPO_T4_New.ipynb`, `data/pref/stats.json`, `data/eval/judge_summary.json`, `data/eval/judge_results_rm.json`, `data/eval/side_by_side.jsonl` và bốn ảnh trong `submission/screenshots/`. Số liệu DPO đã được đối chiếu trực tiếp với `adapters/dpo/dpo_metrics.json`; `adapter_config.json` và `split.json` ghi cấu hình adapter cùng dấu vân tay hai tập dữ liệu.
 
+**Phạm vi báo cáo:** NB0–NB4 (phần bắt buộc); chưa thực hiện bonus.
+
 ---
 
 ## 1. Cấu hình
@@ -79,77 +81,11 @@ Ví dụ **hữu ích h4** trong `side_by_side.jsonl`: với yêu cầu so sánh
 
 ---
 
-## 5. Đánh đổi theo β (bonus `make beta-sweep`)
-
-| β | Margin held-out | Độ chính xác held-out | Chẩn đoán | Ghi chú |
-|---:|---:|---:|---|---|
-| 0,05 | — | — | — | Chưa chạy β-sweep |
-| 0,1 | 0,159119 | 75,0% | `INTENDED` | Run DPO mặc định, không phải nhánh β-sweep |
-| 0,5 | — | — | — | Chưa chạy β-sweep |
-
-Giả thuyết, **không phải kết quả thực nghiệm**: β nhỏ hơn có thể cho policy thay đổi mạnh hơn so với reference và tăng margin nhanh hơn, nhưng cũng có nguy cơ lệch khỏi SFT. β lớn hơn có thể giữ đầu ra gần SFT hơn và làm chênh lệch reward nhỏ hơn. Muốn kiểm tra cần chạy các β trên cùng split và seed, rồi so margin, accuracy held-out và độ dài đầu ra; hiện chỉ có β = 0,1.
-
----
-
 ## 6. Một quyết định quan trọng nhất (≥ 150 từ)
 
 Tôi chọn **β = 0,1** cho DPO. Đây là cấu hình được ghi trong `dpo_metrics.json` và output notebook, giúp huấn luyện trên T4 có một điểm xuất phát cụ thể: 800 cặp train, 100 cặp held-out, learning rate `5e-6`, một epoch và loss sigmoid. Các phương án thay thế là β = 0,05 hoặc β = 0,5, nhưng tôi chưa chạy chúng; vì vậy không thể gọi β = 0,1 là tối ưu. Về cơ chế, β nhân với chênh lệch log-ratio giữa policy và reference trong DPO loss. Tôi giữ cấu hình mặc định để kiểm tra trọn luồng từ SFT đã gộp, chia dữ liệu, huấn luyện đến đánh giá mà không đổi nhiều biến cùng lúc. NB0 xác nhận công thức tự cài khớp tham chiếu và loss khởi tạo gần `log 2`, giúp kiểm tra cách hiểu phép tính.
 
 Kết quả vừa xác nhận vừa giới hạn quyết định này. DPO loss ở lần ghi đầu là `0,6932`, còn loss trung bình toàn run được trainer báo sau khi huấn luyện là `0,6541`; reward margin held-out là `0,1591`, accuracy held-out 75%, và chosen/rejected held-out cùng đi lên. Mô hình đã học phân biệt nhãn preference, nhưng trên 50 câu held-out, win rate trước SFT chỉ 53% với CI 42–64%, vẫn chứa 50%. Reward chosen tăng không tự động có nghĩa người dùng sẽ thích đầu ra hơn: giám khảo có thể thiên vị, hai reward model Skywork không độc lập với nguồn nhãn, và nhiều đầu ra còn chuỗi `<tool_call>`. Nếu làm lại, tôi sẽ giữ split và seed, chạy β = 0,05 và 0,5 làm đối chứng, ghi margin, accuracy, độ dài và win rate kèm CI. Tôi cũng sẽ nhờ giám khảo khác họ và đọc thủ công các câu thua hoặc hoà, rồi mới chọn β cho lần triển khai tiếp theo.
-
----
-
-## 7. Bộ đo chuẩn (bonus NB6, ≥ 150 từ)
-
-> Ảnh: `screenshots/07-benchmark-comparison.png` — chưa có vì NB6 chưa chạy.
-
-| Bộ đo | Giới hạn / môn con | SFT (± stderr) | SFT+DPO (± stderr) | Δ |
-|---|---:|---:|---:|---:|
-| IFEval | — | — | — | — |
-| GSM8K | — | — | — | — |
-| Global-MMLU-vi | — | — | — | — |
-
-Chưa có `data/eval/benchmark_results.json`; do đó chưa thể so Δ với sai số chuẩn, kết luận về “thuế căn chỉnh” trên GSM8K hoặc đối chiếu NB6 với NB4. Mục này là bonus chưa thực hiện.
-
----
-
-## 8. Biến thể loss (bonus NB3b)
-
-> Ảnh: `screenshots/03b-variants.png` — chưa có vì NB3b chưa chạy.
-
-| Loss | Độ chính xác held-out | Margin held-out | Độ dài trung bình | Nhận xét |
-|---|---:|---:|---:|---|
-| DPO | 75,0% | 0,159119 | — | Run NB3 mặc định; chưa có bảng so biến thể |
-| RPO | — | — | — | Chưa chạy |
-| DPO-norm | — | — | — | Chưa chạy |
-| LD-DPO | — | — | — | Chưa chạy |
-| ORPO | — | — | — | Chưa chạy |
-
-Chưa thể biết biến thể nào đổi độ dài nhiều nhất. Dữ liệu DPO chỉ dẫn lại từ NB3, không có nghĩa đã chạy bài so sánh NB3b.
-
----
-
-## 9. GRPO (bonus NB7)
-
-| | Giá trị |
-|---|---:|
-| Độ chính xác trước / sau (n câu kiểm tra) | Chưa có — NB7 chưa chạy |
-| Sai số chuẩn ≈ √(p(1−p)/n) | Chưa thể tính vì thiếu p và n |
-
-Chưa có đường reward hoặc độ chính xác trước/sau, nên chưa thể kết luận thành phần reward nào tăng trước hay chênh lệch có vượt nhiễu.
-
----
-
-## Danh sách bonus
-
-- [ ] NB3b — biến thể loss (+8)
-- [ ] NB5 — GGUF SFT+DPO (+4)
-- [ ] NB6 — benchmark (+6)
-- [ ] NB7 — GRPO (+8)
-- [ ] β-sweep (+6)
-- [ ] Chấm chéo bằng hai họ mô hình (+4)
-- [ ] Đẩy lên HF Hub + thẻ mô tả mô hình (+3)
-- [ ] `BONUS-CHALLENGE.md` (không chấm điểm)
 
 ---
 
